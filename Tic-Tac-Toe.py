@@ -1,157 +1,174 @@
 from tkinter import *
 import random
 from functools import partial
+import tkinter as tk
+from tkinter import messagebox
+import math
 
 def button1_clicked():
-  global window
-  window=Tk()
-  window.title("Tic-Tac-Toe")
-  players = ["X", "O"]
-  player = random.choice(players)
-  buttons = [[0, 0, 0],
-             [0, 0, 0],
-             [0, 0, 0]]
-  label3 = Label(text=player + " turn", font=('consolas', 40))
-  label3.pack(side="top")
+    PLAYER = -1
+    AI = 1
+    # Empty cell marker
+    EMPTY = 0
 
-  def next_turn(row, column):
-      nonlocal player
-      if buttons[row][column]['text'] == "" and evaluate(buttons) is False:
-          # Human player's move
-          buttons[row][column]['text'] = player
-          if evaluate(buttons) is False:
-              # Check if game is still ongoing
-              if player == players[0]:
-                  player = players[1]
-                  label3.config(text=player + " turn")
-                  # AI player's move
-                  ai_move()
-                  if evaluate(buttons) is True:
-                      label3.config(text=player + " wins")
-                  elif evaluate(buttons) == "Tie":
-                      label3.config(text="Tie")
-              else:
-                  player = players[0]
-                  label3.config(text=player + " turn")
-          elif evaluate(buttons) is True:
-              label3.config(text=player + " wins")
-          elif evaluate(buttons) == "Tie":
-              label3.config(text="Tie")
+    class TicTacToe(tk.Tk):
+        def __init__(self):
+            super().__init__()
 
-  def ai_move():
-      best_val = -float('inf')
-      best_move = None
-      for i in range(3):
-          for j in range(3):
-              if buttons[i][j]['text'] == "":
-                  buttons[i][j]['text'] = players[1]  # AI player
-                  move_val = minimax(buttons, 0, False)
-                  buttons[i][j]['text'] = ""  # Undo the move
-                  if move_val > best_val:
-                      best_val = move_val
-                      best_move = (i, j)
-      row, col = best_move
-      buttons[row][col]['text'] = players[1]  # AI player
+            self.title("Tic Tac Toe")
+            self.geometry("300x300")
 
-  def evaluate(buttons):
+            self.board = [[EMPTY, EMPTY, EMPTY],
+                          [EMPTY, EMPTY, EMPTY],
+                          [EMPTY, EMPTY, EMPTY]]
 
-          for row in range(3):
-              if buttons[row][0]['text'] == buttons[row][1]['text'] == buttons[row][2]['text'] != "":
-                  buttons[row][0].config(bg="green")
-                  buttons[row][1].config(bg="green")
-                  buttons[row][2].config(bg="green")
-                  return 10 if player[row][0] == 'X' else -10
+            self.buttons = [[None] * 3 for _ in range(3)]
 
-          for column in range(3):
-              if buttons[0][column]['text'] == buttons[1][column]['text'] == buttons[2][column]['text'] != "":
-                  buttons[0][column].config(bg="green")
-                  buttons[1][column].config(bg="green")
-                  buttons[2][column].config(bg="green")
-                  return 10 if player[0][column] == 'X' else -10
+            self.current_player = PLAYER
+            self.game_over = False  # Flag to indicate whether the game is over
 
-          if buttons[0][0]['text'] == buttons[1][1]['text'] == buttons[2][2]['text'] != "":
-              buttons[0][0].config(bg="green")
-              buttons[1][1].config(bg="green")
-              buttons[2][2].config(bg="green")
-              return 10 if player[0][0] == 'X' else -10
+            self.create_board()
 
-          if buttons[0][2]['text'] == buttons[1][1]['text'] == buttons[2][0]['text'] != "":
-              buttons[0][2].config(bg="green")
-              buttons[1][1].config(bg="green")
-              buttons[2][0].config(bg="green")
-              return 10 if player[0][2] == 'X' else -10
+        def create_board(self):
+            for i in range(3):
+                for j in range(3):
+                    self.buttons[i][j] = tk.Button(self, text="", font=('Arial', 20), width=5, height=2,
+                                                   command=lambda row=i, col=j: self.on_button_click(row, col))
+                    self.buttons[i][j].grid(row=i, column=j)
 
-          elif empty_spaces() is False:
-              for row in range(3):
-                  for column in range(3):
-                      buttons[row][column].config(bg="yellow")
-              return "Tie"
-              return 0
-          else:
-              return False
+        def on_button_click(self, row, col):
+            if not self.game_over and self.board[row][col] == EMPTY:
+                self.board[row][col] = self.current_player
+                self.update_button_text(row, col)
+                winner = self.check_winner()
+                if winner == PLAYER:
+                    self.end_game("Player wins!")
+                    self.game_over = True
+                elif winner == AI:
+                    self.end_game("AI wins!")
+                    self.game_over = True
+                elif self.check_draw():
+                    self.end_game("It's a draw!")
+                    self.game_over = True
+                else:
+                    self.current_player *= -1
+                    if self.current_player == AI:
+                        self.ai_move()
 
-  def empty_spaces():
-      spaces = 9
-      for row in range(3):
-          for column in range(3):
-              if buttons[row][column]['text'] != '':
-                  spaces -= 1
-      if spaces == 0:
-          return False
-      else:
-          return True
+        def update_button_text(self, row, col):
+            player = self.board[row][col]
+            text = "X" if player == PLAYER else "O"
+            self.buttons[row][col].config(text=text, state="disabled")
 
+        def highlight_winning_row(self):
+            winning_row = self.find_winning_row()
+            if winning_row is not None:
+                for col in range(3):
+                    self.buttons[winning_row][col].config(bg='green')
 
-  def minimax(buttons,depth,is_max):
-      score=evaluate(buttons)
+        def find_winning_row(self):
+            for row in range(3):
+                if all(self.board[row][col] == self.board[row][0] != EMPTY for col in range(3)):
+                    return row
+            return None
 
-      if score==10:
-          return score-depth
-      if score==-10:
-          return score+depth
-      if all(buttons[i][j] != ' ' for i in range(3) for j in range(3)):
-          return 0
+        def ai_move(self):
+            best_score = -math.inf
+            best_move = None
 
-      if is_max:
-          best = -float('inf')
-          for i in range(3):
-              for j in range(3):
-                  if buttons[i][j] == ' ':
-                      buttons[i][j] = 'X'
-                      best = max(best, minimax(buttons, depth + 1, not is_max))
-                      buttons[i][j] = ' '
-          return best
-      else:
-          best = float('inf')
-          for i in range(3):
-              for j in range(3):
-                  if buttons[i][j] == ' ':
-                      buttons[i][j] = 'O'
-                      best = min(best, minimax(buttons, depth + 1, not is_max))
-                      buttons[i][j] = ' '
-          return best
+            for row in range(3):
+                for col in range(3):
+                    if self.board[row][col] == EMPTY:
+                        self.board[row][col] = AI
+                        score = self.minimax(self.board, 0, False)
+                        self.board[row][col] = EMPTY
+                        if score > best_score:
+                            best_score = score
+                            best_move = (row, col)
 
-  def new_game():
-      nonlocal player
-      player = random.choice(players)
-      label3.config(text=player + " turn")
-      for row in range(3):
-          for column in range(3):
-              buttons[row][column].config(text="", bg="#F0f0f0")
+            if best_move:
+                row, col = best_move
+                self.board[row][col] = AI
+                self.update_button_text(row, col)
+                winner = self.check_winner()
+                if winner == AI:
+                    self.end_game("AI wins!")
+                    self.game_over = True
+                elif self.check_draw():
+                    self.end_game("It's a draw!")
+                    self.game_over = True
+                else:
+                    self.current_player *= -1
 
-  reset_button = Button(window, text="Restart", font=('consolas', 20), command=new_game)
-  reset_button.pack(side="top")
+        def minimax(self, board, depth, is_maximizing):
+            result = self.evaluate(board)
 
-  frame = Frame(window)
-  frame.pack()
+            if result is not None:
+                return result
 
-  for row in range(3):
-      for column in range(3):
-          buttons[row][column] = Button(frame, text="", font=('consolas', 20), width=5, height=2)
-          buttons[row][column].config(command=partial(next_turn, row, column))
-          buttons[row][column].grid(row=row, column=column)
+            if is_maximizing:
+                best_score = -math.inf
+                for row in range(3):
+                    for col in range(3):
+                        if board[row][col] == EMPTY:
+                            board[row][col] = AI
+                            score = self.minimax(board, depth + 1, False)
+                            board[row][col] = EMPTY
+                            best_score = max(score, best_score)
+                return best_score
+            else:
+                best_score = math.inf
+                for row in range(3):
+                    for col in range(3):
+                        if board[row][col] == EMPTY:
+                            board[row][col] = PLAYER
+                            score = self.minimax(board, depth + 1, True)
+                            board[row][col] = EMPTY
+                            best_score = min(score, best_score)
+                return best_score
 
-  window.mainloop()
+        def evaluate(self, board):
+            # Check rows
+            for row in board:
+                if all(cell == PLAYER for cell in row):
+                    return PLAYER
+                elif all(cell == AI for cell in row):
+                    return AI
+
+            # Check columns
+            for col in range(3):
+                if all(board[row][col] == PLAYER for row in range(3)):
+                    return PLAYER
+                elif all(board[row][col] == AI for row in range(3)):
+                    return AI
+
+            # Check diagonals
+            if all(board[i][i] == PLAYER for i in range(3)) or all(board[i][2 - i] == PLAYER for i in range(3)):
+                return PLAYER
+            elif all(board[i][i] == AI for i in range(3)) or all(board[i][2 - i] == AI for i in range(3)):
+                return AI
+
+            # Check for draw
+            if all(cell != EMPTY for row in board for cell in row):
+                return 0  # Draw
+
+            # Game still ongoing
+            return None
+
+        def check_winner(self):
+            return self.evaluate(self.board)
+
+        def check_draw(self):
+            return self.evaluate(self.board) == 0 and not any(EMPTY in row for row in self.board)
+
+        def end_game(self, message):
+            messagebox.showinfo("Game Over", message)
+            if self.game_over:
+                self.highlight_winning_row()
+
+    if __name__ == "__main__":
+        game = TicTacToe()
+        game.mainloop()
 
 
 def button2_clicked():
